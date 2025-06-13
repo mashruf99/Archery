@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archery Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+
+<body>
+    <div id="game-container">
+        <div id="score" class="ui-element top-5 left-5">SCORE 00</div>
+        <div id="shots" class="ui-element top-16 left-5">SHOTS REMAIN 10</div>
+        <div id="timer" class="ui-element top-5 right-16 text-4xl">5.0</div>
+        <button id="mute-button" class="ui-element top-5 right-32">
+            <svg class="sound-icon" viewBox="0 0 100 100" fill="white" width="30" height="30">
+                <path d="M20 35 L20 65 L40 65 L65 90 L65 10 L40 35 Z"/>
+                <path d="M75 30 C80 40, 80 60, 75 70" stroke="white" stroke-width="8" fill="none"/>
+                <path d="M85 20 C95 35, 95 65, 85 80" stroke="white" stroke-width="8" fill="none"/>
+            </svg>
+        </button>
+        <div id="pause-button" class="ui-element top-5 right-5">
+            <svg class="pause-icon" viewBox="0 0 100 100" fill="white" width="30" height="30">
+                <rect x="25" y="15" width="15" height="70" rx="5"></rect>
+                <rect x="60" y="15" width="15" height="70" rx="5"></rect>
+            </svg>
+        </div>
+        <div id="power-bar-container" class="hidden">
+            <div id="power-bar"></div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="hills">
+            <div class="hill-1"></div>
+            <div class="hill-2"></div>
+        </div>
+
+        <div id="start-menu" class="menu">
+            <div class="menu-box">
+                <div class="menu-title">PLAY ARCHERY</div>
+                <button id="start-button" class="menu-button start-button">NEW GAME</button>
+                <button class="menu-button exit-button">EXIT</button>
+            </div>
+        </div>
+
+        <div id="pause-menu" class="menu hidden">
+             <div class="menu-box">
+                <div class="menu-title">PAUSED</div>
+                <button id="resume-button" class="menu-button resume-button">RESUME</button>
+                <button id="ext" class="menu-button exit-button">EXIT TO MENU</button>
+            </div>
+        </div>
+
+        <div id="game-over-menu" class="menu hidden">
+             <div class="menu-box">
+                <div class="menu-title">GAME OVER</div>
+                <div id="final-score" class="menu-score">YOUR SCORE 00</div>
+                <button id="restart-button" class="menu-button start-button">PLAY AGAIN</button>
+                <button class="menu-button exit-button">EXIT</button>
+            </div>
+        </div>
+
+        <audio id="background-music" loop>
+            <source src="sound.mp3" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
