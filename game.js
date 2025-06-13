@@ -8,7 +8,7 @@ const powerBarContainer = document.getElementById('power-bar-container');
 const powerBar = document.getElementById('power-bar');
 const backgroundMusic = document.getElementById('background-music');
 const muteButton = document.getElementById('mute-button');
-
+const mobileHint = document.getElementById('mobile-hint');
 
 const startMenu = document.getElementById('start-menu');
 const gameOverMenu = document.getElementById('game-over-menu');
@@ -19,7 +19,6 @@ const resumeButton = document.getElementById('resume-button');
 const pauseButton = document.getElementById('pause-button');
 const exitToMainMenuButton = document.getElementById('ext');
 const finalScoreEl = document.getElementById('final-score');
-
 
 let canvasWidth, canvasHeight;
 const scoreValues = { RED: 10, BLUE: 7, BLACK: 5, WHITE: 3 };
@@ -40,7 +39,6 @@ let isCharging = false;
 let chargePower = 0;
 let isMusicPlaying = false;
 
-
 const bow = { x: 100, y: 300, angle: 0 };
 const target = {
     x: 850,
@@ -52,7 +50,13 @@ const target = {
 };
 const sun = { x: 500, y: 100, radius: 40 };
 
+// Touch event variables
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
 
+// Event Listeners
 startButton.addEventListener('click', startGame);
 restartButton.addEventListener('click', startGame);
 pauseButton.addEventListener('click', togglePause);
@@ -61,18 +65,63 @@ exitToMainMenuButton.addEventListener('click', exitToMainMenu);
 muteButton.addEventListener('click', toggleMute);
 window.addEventListener('resize', resizeCanvas);
 
+// Initialize the game
+initializeGame();
+
 function setupMouseListeners(enable) {
     if (enable) {
         canvas.addEventListener('mousemove', aimBow);
         canvas.addEventListener('mousedown', startCharge);
         canvas.addEventListener('mouseup', shootArrow);
+        setupTouchListeners(true);
     } else {
         canvas.removeEventListener('mousemove', aimBow);
         canvas.removeEventListener('mousedown', startCharge);
         canvas.removeEventListener('mouseup', shootArrow);
+        setupTouchListeners(false);
     }
 }
 
+function setupTouchListeners(enable) {
+    if (enable) {
+        canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+        canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+        canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+    } else {
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchend', handleTouchEnd);
+    }
+}
+
+function handleTouchStart(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    
+    // Start charging on touch
+    if (!arrow || arrow.isFlying || arrow.isStuck || isPaused) return;
+    isCharging = true;
+    chargePower = MIN_POWER;
+    
+    // Also aim the bow
+    const rect = canvas.getBoundingClientRect();
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    aimBow({clientX: touch.clientX, clientY: touch.clientY});
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    aimBow({clientX: touch.clientX, clientY: touch.clientY});
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    shootArrow();
+}
 
 function toggleMute() {
     if (isMusicPlaying) {
@@ -92,19 +141,53 @@ function toggleMute() {
     isMusicPlaying = !isMusicPlaying;
 }
 
-
 function initializeGame() {
+    // Prevent default touch behaviors
+    document.addEventListener('touchstart', function(e) {
+        if (e.target === canvas) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    document.addEventListener('touchend', function(e) {
+        if (e.target === canvas) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    document.addEventListener('touchmove', function(e) {
+        if (e.target === canvas) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
     resizeCanvas();
     drawStaticElements();
     backgroundMusic.volume = 0.6;
 }
 
 function resizeCanvas() {
-    canvasWidth = gameContainer.clientWidth;
-    canvasHeight = gameContainer.clientHeight;
+    const isMobile = window.innerWidth <= 932 || window.innerHeight <= 430;
+    
+    if (isMobile) {
+        canvasWidth = window.innerWidth;
+        canvasHeight = window.innerHeight;
+        gameContainer.style.maxWidth = '100%';
+        gameContainer.style.maxHeight = '100%';
+        gameContainer.style.borderRadius = '0';
+        
+        target.radii = { white: 60, black: 45, blue: 30, red: 15 };
+    } else {
+        canvasWidth = gameContainer.clientWidth;
+        canvasHeight = gameContainer.clientHeight;
+        gameContainer.style.maxWidth = '1000px';
+        gameContainer.style.maxHeight = '600px';
+        gameContainer.style.borderRadius = '20px';
+        target.radii = { white: 80, black: 60, blue: 40, red: 20 };
+    }
+    
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
-    
     bow.x = canvasWidth * 0.1;
     bow.y = canvasHeight / 2;
     target.x = canvasWidth * 0.85;
@@ -116,10 +199,9 @@ function resizeCanvas() {
     if (!isGameOver) {
         draw();
     } else {
-         drawStaticElements();
+        drawStaticElements();
     }
 }
-
 
 function startGame() {
     score = 0;
@@ -280,24 +362,26 @@ function drawBow() {
     ctx.save();
     ctx.translate(bow.x, bow.y);
     ctx.rotate(bow.angle);
+    const bowScale = Math.min(canvasWidth, canvasHeight) / 600;
+    const bowRadius = 60 * bowScale;
 
     ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 8;
+    ctx.lineWidth = 8 * bowScale;
     ctx.beginPath();
-    ctx.arc(0, 0, 60, -Math.PI / 2.5, Math.PI / 2.5);
+    ctx.arc(0, 0, bowRadius, -Math.PI / 2.5, Math.PI / 2.5);
     ctx.stroke();
 
     ctx.strokeStyle = '#CCCCCC';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * bowScale;
     ctx.beginPath();
-    const bowTip1Y = 60 * Math.sin(-Math.PI / 2.5);
-    const bowTip1X = 60 * Math.cos(-Math.PI / 2.5);
-    const bowTip2Y = 60 * Math.sin(Math.PI / 2.5);
-    const bowTip2X = 60 * Math.cos(Math.PI / 2.5);
+    const bowTip1Y = bowRadius * Math.sin(-Math.PI / 2.5);
+    const bowTip1X = bowRadius * Math.cos(-Math.PI / 2.5);
+    const bowTip2Y = bowRadius * Math.sin(Math.PI / 2.5);
+    const bowTip2X = bowRadius * Math.cos(Math.PI / 2.5);
     ctx.moveTo(bowTip1X, bowTip1Y);
     
     if (isCharging || (arrow && !arrow.isFlying && !arrow.isStuck)) {
-        let pullback = (chargePower / MAX_POWER) * 25;
+        let pullback = (chargePower / MAX_POWER) * (25 * bowScale);
         ctx.lineTo(-pullback, 0); 
     }
       
@@ -308,6 +392,8 @@ function drawBow() {
 
 function drawArrow() {
     ctx.save();
+    const arrowScale = Math.min(canvasWidth, canvasHeight) / 600;
+    
     if (arrow.isStuck) {
         ctx.translate(arrow.x, arrow.y);
         ctx.rotate(arrow.hitAngle);
@@ -315,29 +401,28 @@ function drawArrow() {
         ctx.translate(arrow.x, arrow.y);
         ctx.rotate(Math.atan2(arrow.vy, arrow.vx));
     } else {
-        let pullback = (chargePower / MAX_POWER) * 25;
+        let pullback = (chargePower / MAX_POWER) * (25 * arrowScale);
         ctx.translate(bow.x, bow.y);
         ctx.rotate(bow.angle);
         ctx.translate(-pullback, 0);
     }
 
     ctx.strokeStyle = '#D2691E';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4 * arrowScale;
     ctx.beginPath();
-    ctx.moveTo(-30, 0);
-    ctx.lineTo(30, 0);
+    ctx.moveTo(-30 * arrowScale, 0);
+    ctx.lineTo(30 * arrowScale, 0);
     ctx.stroke();
 
     ctx.fillStyle = '#120902';
     ctx.beginPath();
-    ctx.moveTo(30, 0);
-    ctx.lineTo(20, -5);
-    ctx.lineTo(20, 5);
+    ctx.moveTo(30 * arrowScale, 0);
+    ctx.lineTo(20 * arrowScale, -5 * arrowScale);
+    ctx.lineTo(20 * arrowScale, 5 * arrowScale);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
 }
-
 function aimBow(event) {
     if (isPaused || isCharging || (arrow && arrow.isStuck)) return;
     const rect = canvas.getBoundingClientRect();
@@ -446,4 +531,3 @@ function updatePowerBar() {
     const powerPercentage = ((chargePower - MIN_POWER) / (MAX_POWER - MIN_POWER)) * 100;
     powerBar.style.width = `${Math.max(0, powerPercentage)}%`;
 }
-initializeGame();
