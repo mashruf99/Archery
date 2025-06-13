@@ -8,7 +8,6 @@ const powerBarContainer = document.getElementById('power-bar-container');
 const powerBar = document.getElementById('power-bar');
 const backgroundMusic = document.getElementById('background-music');
 const muteButton = document.getElementById('mute-button');
-const mobileHint = document.getElementById('mobile-hint');
 
 const startMenu = document.getElementById('start-menu');
 const gameOverMenu = document.getElementById('game-over-menu');
@@ -50,11 +49,15 @@ const target = {
 };
 const sun = { x: 500, y: 100, radius: 40 };
 
-let touchStartX = 0;
-let touchStartY = 0;
-let touchEndX = 0;
-let touchEndY = 0;
+// Touch control variables
+let touchId = null;
+let isTouchCharging = false;
+let touchIndicator = { x: 0, y: 0, active: false };
 
+// Initialize game
+initializeGame();
+
+// Event listeners
 startButton.addEventListener('click', startGame);
 restartButton.addEventListener('click', startGame);
 pauseButton.addEventListener('click', togglePause);
@@ -63,59 +66,108 @@ exitToMainMenuButton.addEventListener('click', exitToMainMenu);
 muteButton.addEventListener('click', toggleMute);
 window.addEventListener('resize', resizeCanvas);
 
-initializeGame();
-
-function setupMouseListeners(enable) {
-    if (enable) {
-        canvas.addEventListener('mousemove', aimBow);
-        canvas.addEventListener('mousedown', startCharge);
-        canvas.addEventListener('mouseup', shootArrow);
-        setupTouchListeners(true);
-    } else {
-        canvas.removeEventListener('mousemove', aimBow);
-        canvas.removeEventListener('mousedown', startCharge);
-        canvas.removeEventListener('mouseup', shootArrow);
-        setupTouchListeners(false);
-    }
+function setupControls() {
+    // Mouse controls
+    canvas.addEventListener('mousemove', aimBow);
+    canvas.addEventListener('mousedown', startCharge);
+    canvas.addEventListener('mouseup', shootArrow);
+    
+    // Touch controls
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchCancel, { passive: false });
 }
 
-function setupTouchListeners(enable) {
-    if (enable) {
-        canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
-        canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
-        canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
-    } else {
-        canvas.removeEventListener('touchstart', handleTouchStart);
-        canvas.removeEventListener('touchmove', handleTouchMove);
-        canvas.removeEventListener('touchend', handleTouchEnd);
-    }
+function removeControls() {
+    // Mouse controls
+    canvas.removeEventListener('mousemove', aimBow);
+    canvas.removeEventListener('mousedown', startCharge);
+    canvas.removeEventListener('mouseup', shootArrow);
+    
+    // Touch controls
+    canvas.removeEventListener('touchstart', handleTouchStart);
+    canvas.removeEventListener('touchmove', handleTouchMove);
+    canvas.removeEventListener('touchend', handleTouchEnd);
+    canvas.removeEventListener('touchcancel', handleTouchCancel);
 }
 
 function handleTouchStart(e) {
     e.preventDefault();
-    const touch = e.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
+    if (touchId !== null || isGameOver || isPaused) return;
     
-    if (!arrow || arrow.isFlying || arrow.isStuck || isPaused) return;
-    isCharging = true;
-    chargePower = MIN_POWER;
+    const touch = e.changedTouches[0];
+    touchId = touch.identifier;
     
+    // Update touch indicator
     const rect = canvas.getBoundingClientRect();
-    const touchX = touch.clientX - rect.left;
-    const touchY = touch.clientY - rect.top;
-    aimBow({clientX: touch.clientX, clientY: touch.clientY});
+    touchIndicator.x = touch.clientX - rect.left;
+    touchIndicator.y = touch.clientY - rect.top;
+    touchIndicator.active = true;
+    
+    // Start aiming
+    aimBow({ clientX: touch.clientX, clientY: touch.clientY });
+    
+    // Start charging after a brief delay
+    setTimeout(() => {
+        if (touchId !== null && !arrow?.isFlying && !arrow?.isStuck) {
+            isTouchCharging = true;
+            startCharge();
+        }
+    }, 50);
 }
 
 function handleTouchMove(e) {
     e.preventDefault();
-    const touch = e.touches[0];
-    aimBow({clientX: touch.clientX, clientY: touch.clientY});
+    if (touchId === null) return;
+    
+    // Find our touch
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId);
+    if (!touch) return;
+    
+    // Update touch indicator
+    const rect = canvas.getBoundingClientRect();
+    touchIndicator.x = touch.clientX - rect.left;
+    touchIndicator.y = touch.clientY - rect.top;
+    
+    // Continue aiming
+    aimBow({ clientX: touch.clientX, clientY: touch.clientY });
 }
 
 function handleTouchEnd(e) {
     e.preventDefault();
-    shootArrow();
+    if (touchId === null) return;
+    
+    // Find our touch
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId);
+    if (!touch) return;
+    
+    // Shoot if charging
+    if (isTouchCharging) {
+        shootArrow();
+    }
+    
+    // Reset touch state
+    resetTouchState();
+}
+
+function handleTouchCancel(e) {
+    e.preventDefault();
+    if (touchId === null) return;
+    resetTouchState();
+}
+
+function resetTouchState() {
+    touchId = null;
+    isTouchCharging = false;
+    touchIndicator.active = false;
+    
+    // Only reset charging if not already shooting
+    if (!arrow?.isFlying) {
+        isCharging = false;
+        chargePower = 0;
+        updatePowerBar();
+    }
 }
 
 function toggleMute() {
@@ -137,22 +189,17 @@ function toggleMute() {
 }
 
 function initializeGame() {
+    // Prevent default touch behaviors
     document.addEventListener('touchstart', function(e) {
-        if (e.target === canvas) {
-            e.preventDefault();
-        }
+        if (e.target === canvas) e.preventDefault();
     }, { passive: false });
     
     document.addEventListener('touchend', function(e) {
-        if (e.target === canvas) {
-            e.preventDefault();
-        }
+        if (e.target === canvas) e.preventDefault();
     }, { passive: false });
     
     document.addEventListener('touchmove', function(e) {
-        if (e.target === canvas) {
-            e.preventDefault();
-        }
+        if (e.target === canvas) e.preventDefault();
     }, { passive: false });
 
     resizeCanvas();
@@ -215,14 +262,14 @@ function startGame() {
     pauseButton.classList.remove('hidden');
     powerBarContainer.classList.remove('hidden');
 
-    setupMouseListeners(true);
+    setupControls();
     resetShot();
     gameLoop();
 }
 
 function endGame() {
     isGameOver = true;
-    setupMouseListeners(false);
+    removeControls();
     clearInterval(shotTimerInterval);
     cancelAnimationFrame(gameTimer);
     pauseButton.classList.add('hidden');
@@ -244,12 +291,12 @@ function togglePause() {
         clearInterval(shotTimerInterval);
         cancelAnimationFrame(gameTimer);
         pauseMenu.classList.remove('hidden');
-        setupMouseListeners(false);
+        removeControls();
         backgroundMusic.pause();
     } else {
         pauseMenu.classList.add('hidden');
         startShotTimer(timeRemainingOnPause);
-        setupMouseListeners(true);
+        setupControls();
         gameLoop();
         backgroundMusic.play();
     }
@@ -261,7 +308,7 @@ function exitToMainMenu() {
 
     clearInterval(shotTimerInterval);
     cancelAnimationFrame(gameTimer);
-    setupMouseListeners(false);
+    removeControls();
     backgroundMusic.pause();
     backgroundMusic.currentTime = 0;
     isMusicPlaying = false;
@@ -317,6 +364,14 @@ function draw() {
     drawTarget();
     drawBow();
     if (arrow) drawArrow();
+    
+    // Draw touch indicator if active
+    if (touchIndicator.active) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(touchIndicator.x, touchIndicator.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 function drawStaticElements() {
@@ -417,6 +472,7 @@ function drawArrow() {
     ctx.fill();
     ctx.restore();
 }
+
 function aimBow(event) {
     if (isPaused || isCharging || (arrow && arrow.isStuck)) return;
     const rect = canvas.getBoundingClientRect();
@@ -443,6 +499,7 @@ function shootArrow() {
     if (!isCharging || !arrow || arrow.isFlying || isPaused) return;
     
     isCharging = false;
+    isTouchCharging = false;
     clearInterval(shotTimerInterval);
 
     arrow.isFlying = true;
@@ -493,6 +550,7 @@ function resetShot() {
     chargePower = 0;
     updatePowerBar();
     isCharging = false;
+    isTouchCharging = false;
     startShotTimer(5.0);
 }
 
