@@ -50,13 +50,11 @@ const target = {
 };
 const sun = { x: 500, y: 100, radius: 40 };
 
-// Touch event variables
 let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
 let touchEndY = 0;
 
-// Event Listeners
 startButton.addEventListener('click', startGame);
 restartButton.addEventListener('click', startGame);
 pauseButton.addEventListener('click', togglePause);
@@ -65,7 +63,6 @@ exitToMainMenuButton.addEventListener('click', exitToMainMenu);
 muteButton.addEventListener('click', toggleMute);
 window.addEventListener('resize', resizeCanvas);
 
-// Initialize the game
 initializeGame();
 
 function setupMouseListeners(enable) {
@@ -100,12 +97,10 @@ function handleTouchStart(e) {
     touchStartX = touch.clientX;
     touchStartY = touch.clientY;
     
-    // Start charging on touch
     if (!arrow || arrow.isFlying || arrow.isStuck || isPaused) return;
     isCharging = true;
     chargePower = MIN_POWER;
     
-    // Also aim the bow
     const rect = canvas.getBoundingClientRect();
     const touchX = touch.clientX - rect.left;
     const touchY = touch.clientY - rect.top;
@@ -142,7 +137,6 @@ function toggleMute() {
 }
 
 function initializeGame() {
-    // Prevent default touch behaviors
     document.addEventListener('touchstart', function(e) {
         if (e.target === canvas) {
             e.preventDefault();
